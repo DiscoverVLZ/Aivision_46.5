@@ -1,0 +1,6 @@
+{
+  "name": "Monolith OS",
+  "description": "Industrial Hybrid CV Surveillance and Object Detection System with local Web-Control and Termux support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

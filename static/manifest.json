@@ -1,0 +1,22 @@
+{
+  "name": "Monolith OS v1500",
+  "short_name": "Monolith OS",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#030712",
+  "theme_color": "#030712",
+  "description": "Industrial Hybrid CV Surveillance and Object Detection System with local Web-Control and Termux support.",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/nolan/192/matrix.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://img.icons8.com/nolan/512/matrix.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

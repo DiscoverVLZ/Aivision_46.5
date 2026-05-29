@@ -1,0 +1,37 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Outer industrial target frame corners -->
+    <path
+        android:strokeColor="#10B981"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M 30,30 L 30,22 L 38,22 M 70,22 L 78,22 L 78,30 M 30,78 L 30,86 L 38,86 M 70,86 L 78,86 L 78,78" />
+
+    <!-- Scanner grid horizontal/vertical ticks -->
+    <path
+        android:strokeColor="#047857"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M 22,54 L 32,54 M 76,54 L 86,54 M 54,22 L 54,32 M 54,76 L 54,86" />
+
+    <!-- Concentric lens circle outer -->
+    <path
+        android:strokeColor="#10B981"
+        android:strokeWidth="2.5"
+        android:pathData="M 54,36 A 18,18 0 1,1 53.99,36 Z" />
+
+    <!-- Concentric core iris inner -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M 54,46 A 8,8 0 1,1 53.99,46 Z" />
+        
+    <!-- Tiny lens reflection dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 50,48 A 2,2 0 1,1 49.99,48 Z" />
+        
+</vector>

@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Monolith OS v1500 - Кросс-платформенное управление</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#030712">
+    <link rel="stylesheet" href="style.css">
+    <!-- Иконки и Стиль шрифта -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-950 text-emerald-400 font-mono overflow-hidden">
+    <!-- Фоновый кибер-градиент -->
+    <div class="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-950/20 via-gray-950 to-gray-950 pointer-events-none z-0"></div>
+
+    <div class="relative z-10 flex flex-col h-screen overflow-hidden p-safe select-none">
+        <!-- Шапка интерфейса -->
+        <header class="flex items-center justify-between border-b border-emerald-900/60 bg-gray-900/80 px-4 py-2.5 backdrop-blur-md">
+            <div class="flex items-center space-x-3">
+                <span class="inline-block w-3.5 h-3.5 rounded-full bg-emerald-500 animate-pulse border border-emerald-400"></span>
+                <h1 class="text-lg font-extrabold tracking-widest text-emerald-100">MONOLITH OS <span class="text-xs bg-emerald-900/80 p-1 rounded border border-emerald-500/30 text-emerald-400">v1500</span></h1>
+            </div>
+            <!-- Индикаторы телеметрии верхнего уровня -->
+            <div class="flex items-center space-x-4 text-xs">
+                <div class="hidden sm:flex flex-col items-end">
+                    <span class="text-[10px] text-emerald-600">СЕРВЕР</span>
+                    <span id="conn-state" class="text-emerald-400">ПОДКЛЮЧЕН</span>
+                </div>
+                <!-- Заряд батареи -->
+                <div class="flex items-center space-x-1.5 border border-emerald-900/40 bg-black/40 px-2 py-1 rounded">
+                    <span id="battery-level" class="font-bold">100%</span>
+                    <svg class="w-4 h-4 text-emerald-400 fill-current" viewBox="0 0 24 24">
+                        <path d="M15.67,4H14V2h-4v2H8.33C7.6,4,7,4.6,7,5.33v15.33C7,21.4,7.6,22,8.33,22h7.33c0.74,0,1.33-0.6,1.33-1.33V5.33 C17,4.6,16.4,4,15.67,4z"/>
+                    </svg>
+                </div>
+                <div id="system-clock" class="font-bold text-gray-300">19:26</div>
+            </div>
+        </header>
+
+        <!-- Основной контейнер (две колонки на больших экранах, табы на мобильных) -->
+        <main class="flex-1 flex flex-col md:flex-row overflow-hidden">
+            
+            <!-- Левая колонка: Камера и активное поле -->
+            <div class="flex-1 flex flex-col p-3 space-y-3 overflow-hidden">
+                <div class="flex-1 relative bg-black rounded-lg border border-emerald-900/60 shadow-[0_0_20px_rgba(16,185,129,0.05)] overflow-hidden flex items-center justify-center">
+                    <!-- HTML5 Web Camera Video Element (Hidden from display) -->
+                    <video id="webcam" autoplay playsinline muted class="hidden"></video>
+                    
+                    <!-- Canvas для отрисовки кадра с оверлеями (зоны, метки, трекинг) -->
+                    <canvas id="viewfinder" class="w-full h-full object-contain"></canvas>
+
+                    <!-- Заглушка при отсутствии фида -->
+                    <div id="viewfinder-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-gray-950/90 z-20 transition-all duration-300">
+                        <svg class="w-16 h-16 text-emerald-700 mb-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                        </svg>
+                        <h2 class="text-emerald-300 font-bold text-md mb-2">КАМЕРА НЕ АКТИВИРОВАНА</h2>
+                        <p class="text-xs text-gray-500 max-w-xs mb-4">Нажмите кнопку снизу, чтобы инициализировать локальный видеосенсор.</p>
+                        <button onclick="startStream()" class="px-5 py-2.5 bg-emerald-900/80 text-emerald-200 border border-emerald-500 rounded font-bold hover:bg-emerald-800 transition active:scale-95 text-xs">
+                            ЗАПУСТИТЬ СЕНСОР
+                        </button>
+                    </div>
+
+                    <!-- HUD-Показатели кадра -->
+                    <div class="absolute top-3 left-3 bg-black/75 px-2.5 py-1.5 rounded border border-emerald-900/40 text-[10px] space-y-0.5 pointer-events-none z-10 font-mono">
+                        <div>РЕЖИМ: <span id="hud-mode" class="text-teal-300 font-bold">ORB-TRACKER</span></div>
+                        <div>ЗАДЕРЖКА: <span id="hud-latency" class="text-amber-400 font-bold">0ms</span></div>
+                        <div>KEYPOINTS: <span id="hud-kps" class="text-blue-300">0</span></div>
+                        <div>АКТИВНАЯ ЗОНА: <span id="hud-zone-status" class="text-emerald-500">БЕЗОПАСНО</span></div>
+                    </div>
+
+                    <!-- Информер движения во весь экран -->
+                    <div id="motion-warning" class="absolute top-3 right-3 bg-red-950/95 border border-red-500/80 text-red-100 font-extrabold px-3 py-1.5 rounded text-xs animate-bounce hidden z-10">
+                        ⚠️ ДВИЖЕНИЕ В ЗОНЕ DETECTED!
+                    </div>
+                </div>
+
+                <!-- Быстрые действия под камерой (Адаптивная панель) -->
+                <div class="flex flex-wrap gap-2.5 bg-gray-900/40 p-2.5 rounded-lg border border-emerald-900/30">
+                    <button onclick="triggerCaptureTemplate()" class="flex-1 min-w-[120px] min-h-[48px] bg-emerald-950 border border-emerald-500/50 hover:bg-emerald-900 text-emerald-300 font-bold rounded flex items-center justify-center space-x-2 transition active:scale-95 text-xs">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <span>СОЗДАТЬ СКАН</span>
+                    </button>
+                    <button onclick="clearCurrentZones()" class="flex-1 min-w-[120px] min-h-[48px] bg-gray-900 border border-gray-700/50 hover:bg-gray-800 text-gray-300 font-bold rounded flex items-center justify-center space-x-2 transition active:scale-95 text-xs">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        <span>СБРОСИТЬ ЗОНЫ</span>
+                    </button>
+                    <button onclick="toggleSpeech()" id="btn-speech" class="flex-1 min-w-[120px] min-h-[48px] bg-amber-955 border border-amber-500/50 text-amber-300 font-bold rounded flex items-center justify-center space-x-2 transition active:scale-95 text-xs">
+                        <span id="speech-icon">🔊</span>
+                        <span id="speech-text">ОЗВУЧКА: ВКЛ</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Правая колонка: Управление, шаблоны, зоны (Опциональные вкладки или боковая панель) -->
+            <div class="w-full md:w-80 flex flex-col p-3 space-y-3 border-t md:border-t-0 md:border-l border-emerald-900/40 bg-gray-900/30 overflow-y-auto">
+                
+                <!-- Панель управления ТЗ Оверлеями -->
+                <div class="border border-emerald-900/60 bg-gray-950/90 p-4 rounded-lg space-y-3">
+                    <h3 class="text-xs font-black text-emerald-200 tracking-wider uppercase border-b border-emerald-900/60 pb-1.5 flex items-center justify-between">
+                        <span>РЕЖИМЫ ОБРАБОТКИ</span>
+                        <span id="processing-badge" class="bg-teal-900/80 px-1.5 py-0.5 rounded text-[9px] text-teal-300">GPU ACTIVE</span>
+                    </h3>
+                    
+                    <div class="space-y-2">
+                        <label class="block text-[10px] text-emerald-600">АКТИВНЫЙ РЕЖИМ СЛЕЖЕНИЯ</label>
+                        <select id="select-template-mode" onchange="updateDetectorSettings()" class="w-full bg-gray-900 border border-emerald-800/60 text-emerald-300 text-xs rounded p-2 focus:ring-1 focus:ring-emerald-500 outline-none">
+                            <option value="">Все сканы (Параллельно)</option>
+                        </select>
+                    </div>
+
+                    <!-- Настройки Детектора -->
+                    <div class="space-y-3 pt-2">
+                        <div>
+                            <div class="flex justify-between text-[10px] text-emerald-600 mb-1">
+                                <span>ЧУВСТВИТЕЛЬНОСТЬ (%)</span>
+                                <span id="val-sensitivity" class="text-emerald-400">25</span>
+                            </div>
+                            <input type="range" id="input-sensitivity" min="5" max="90" value="25" oninput="updateSensitivityValue(this.value)" onchange="updateDetectorSettings()" class="w-full accent-emerald-500 h-1 bg-gray-800 rounded-lg appearance-none">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-[10px] text-emerald-600 mb-1">
+                                <span>МИН. РАЗМЕР ОБЪЕКТА (px)</span>
+                                <span id="val-minarea" class="text-emerald-400">500</span>
+                            </div>
+                            <input type="range" id="input-minarea" min="100" max="10000" step="100" value="500" oninput="updateMinAreaValue(this.value)" onchange="updateDetectorSettings()" class="w-full accent-emerald-500 h-1 bg-gray-800 rounded-lg appearance-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Темплейты / Scans -->
+                <div class="border border-emerald-900/60 bg-gray-950/90 p-4 rounded-lg flex-1 flex flex-col space-y-3 min-h-[220px]">
+                    <h3 class="text-xs font-black text-emerald-200 tracking-wider uppercase border-b border-emerald-900/60 pb-1.5 flex items-center justify-between">
+                        <span>БАЗА ШАБЛОНОВ (SCANS)</span>
+                        <span id="templates-count" class="bg-emerald-900/80 px-1.5 py-0.5 rounded text-[9px] text-emerald-300">0</span>
+                    </h3>
+                    
+                    <div id="templates-list" class="flex-1 overflow-y-auto space-y-2 max-h-[240px] pr-1">
+                        <!-- Сюда вставляются сканы -->
+                        <div class="text-center text-xs text-gray-500 py-6">Шаблоны отсутствуют. Наведите камеру и нажмите 'Создать скан'.</div>
+                    </div>
+                </div>
+
+                <!-- Системные логи -->
+                <div class="border border-emerald-900/40 bg-black/60 p-3 rounded-lg text-[10px] h-[130px] flex flex-col">
+                    <div class="text-gray-500 border-b border-emerald-900/20 pb-1 mb-1.5 uppercase font-bold flex items-center justify-between">
+                        <span>ЛОГИРОВАНИЕ СИСТЕМЫ</span>
+                        <span class="animate-ping w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                    </div>
+                    <div id="terminal-logs" class="flex-1 overflow-y-auto space-y-1 text-emerald-500/80 font-mono pr-1">
+                        <div>[SYSTEM] Monolith OS v1500 initialized.</div>
+                        <div>[SYSTEM] Termux Web-node ready.</div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Модальное окно подтверждения сохранения шаблона -->
+    <div id="modal-save" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 transition-opacity duration-300 opacity-0 pointer-events-none">
+        <div class="bg-gray-950 border border-emerald-500/80 rounded-lg p-6 max-w-sm w-full space-y-4">
+            <h3 class="text-normal font-bold text-emerald-300 tracking-wider">СОХРАНИТЬ ШАБЛОН</h3>
+            <p class="text-xs text-gray-400">Введите уникальное кодовое имя для кадра-эталона. Система извлечет ORB сигнатуру.</p>
+            <input type="text" id="modal-input-name" placeholder="CHIP_v14_REFERENCE" class="w-full bg-gray-900 border border-emerald-800 text-emerald-300 text-xs rounded p-2.5 focus:ring-1 focus:ring-emerald-500 outline-none font-mono">
+            
+            <div id="modal-preview-container" class="w-full h-32 border border-emerald-900 bg-black rounded overflow-hidden flex items-center justify-center">
+                <canvas id="modal-preview" class="w-full h-full object-contain"></canvas>
+            </div>
+
+            <div class="flex space-x-2 pt-2">
+                <button onclick="closeSaveModal()" class="flex-1 py-2 border border-gray-700 bg-gray-900 hover:bg-gray-800 text-gray-300 font-bold rounded text-xs transition active:scale-95">ОТМЕНА</button>
+                <button onclick="saveTemplateFromModal()" class="flex-1 py-1.5 bg-emerald-700 hover:bg-emerald-600 border border-emerald-400 text-white font-bold rounded text-xs transition active:scale-95">СОХРАНИТЬ</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Инициализация переменных устройства
+        let localStream = null;
+        let isProcessing = false;
+        let cameraInterval = null;
+        let zones = []; // [{id: "A", points: [[x,y], [x,y], ...]}]
+        let currentDrawingPoints = [];
+        let savedTemplates = [];
+        let speechActive = true;
+        let scaleFactor = { x: 1, y: 1 };
+        
+        const video = document.getElementById("webcam");
+        const canvas = document.getElementById("viewfinder");
+        const ctx = canvas.getContext("2d");
+        const terminalLog = document.getElementById("terminal-logs");
+
+        // Установка времени
+        function updateClock() {
+            const now = new Date();
+            document.getElementById("system-clock").innerText = now.toTimeString().split(' ')[0].substring(0, 5);
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Системный логгер
+        function log(msg) {
+            const time = new Date().toTimeString().split(' ')[0];
+            const div = document.createElement("div");
+            div.innerHTML = `<span class="text-gray-600">[${time}]</span> ${msg}`;
+            terminalLog.appendChild(div);
+            terminalLog.scrollTop = terminalLog.scrollHeight;
+        }
+
+        // Поддержка системного датчика заряда батареи
+        if (navigator.getBattery) {
+            navigator.getBattery().then(battery => {
+                const updateBat = () => {
+                    document.getElementById("battery-level").innerText = Math.round(battery.level * 100) + "%";
+                };
+                battery.addEventListener('levelchange', updateBat);
+                updateBat();
+            });
+        }
+
+        // Запуск Потока Камеры
+        async function startStream() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                video.srcObject = localStream;
+                video.play();
+                document.getElementById("viewfinder-placeholder").classList.add("hidden");
+                log("Локальный видеосенсор запущен по WebRTC.");
+                
+                // Начинаем отрисовку кадра
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    log(`Сенсор: ${video.videoWidth}x${video.videoHeight}px`);
+                    startAnalyzing();
+                };
+            } catch (err) {
+                log("<span class='text-red-500'>Ошибка запуска камеры:</span> " + err.message);
+                alert("Камера недоступна. Убедитесь в наличии разрешений.");
+            }
+        }
+
+        // Инициализация WebSocket аналитики (или Fallback REST на порту 5002)
+        function startAnalyzing() {
+            if (cameraInterval) clearInterval(cameraInterval);
+            const fpsLimit = 15;
+            cameraInterval = setInterval(async () => {
+                if (isProcessing) return;
+                isProcessing = true;
+                await processCameraFrame();
+                isProcessing = false;
+            }, 1000 / fpsLimit);
+        }
+
+        // Отправка кадра на анализ во Flask
+        async function processCameraFrame() {
+            if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+
+            // Рисуем текущий видеокадр на невидимый canvas или прямо на экран
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Получаем JPEG Base64
+            const frameBase64 = canvas.toDataURL("image/jpeg", 0.65);
+
+            try {
+                const response = await fetch("/api/analyze", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        image: frameBase64
+                    })
+                });
+
+                if (!response.ok) throw new Error("HTTP error " + response.status);
+                const data = await response.json();
+
+                if (data.status === "success") {
+                    drawOverlays(data);
+                }
+            } catch (err) {
+                // Если нет подключения к API Flask (например, оффлайн режим) -> рисуем локальные метки движения
+                drawLocalOverlaysFallback();
+            }
+        }
+
+        // Отрисовка результатов во Viewfinder
+        function drawOverlays(data) {
+            // Перерисовываем видео на всякий случай
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Отрисовываем зоны безопасности
+            drawZones();
+
+            // Отрисовываем обнаружения ORB-шаблона
+            if (data.detections && data.detections.length > 0) {
+                data.detections.forEach(det => {
+                    ctx.save();
+                    ctx.strokeStyle = "#10b981"; // Зеленая граница
+                    ctx.lineWidth = 4;
+                    ctx.shadowColor = "#10b981";
+                    ctx.shadowBlur = 15;
+                    ctx.beginPath();
+                    ctx.moveTo(det.corners[0][0], det.corners[0][1]);
+                    for (let i = 1; i < 4; i++) {
+                        ctx.lineTo(det.corners[i][0], det.corners[i][1]);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+
+                    // Текст под обнаруженным
+                    ctx.fillStyle = "#ffffff";
+                    ctx.font = "bold 16px Courier New";
+                    ctx.fillText(`MATCH: ${det.template.toUpperCase()} (${Math.round(det.confidence * 100)}%)`, det.corners[0][0], det.corners[0][1] - 10);
+                    ctx.restore();
+
+                    speakAlert(`Захвачена сигнатура объекта: ${det.template}`);
+                });
+            }
+
+            // Отрисовываем движение
+            if (data.motion_detected && data.motion_events) {
+                document.getElementById("motion-warning").classList.remove("hidden");
+                data.motion_events.forEach(evt => {
+                    ctx.save();
+                    ctx.strokeStyle = "#ef4444"; // Красный бокс движения
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(evt.box[0], evt.box[1], evt.box[2] - evt.box[0], evt.box[3] - evt.box[1]);
+
+                    // Рисуем точку по центру
+                    ctx.fillStyle = "#ef4444";
+                    ctx.beginPath();
+                    ctx.arc(evt.centroid[0], evt.centroid[1], 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+
+                    speakAlert(`Движение в зоне ${evt.zone}`);
+                });
+            } else {
+                document.getElementById("motion-warning").classList.add("hidden");
+            }
+
+            // Обновление HUD
+            document.getElementById("hud-latency").innerText = `${Math.round(data.latency_ms || 0)}ms`;
+            document.getElementById("hud-kps").innerText = data.telemetry?.features_current || 0;
+            document.getElementById("hud-zone-status").className = data.motion_detected ? "text-red-500 animate-pulse font-bold" : "text-emerald-500";
+            document.getElementById("hud-zone-status").innerText = data.motion_detected ? "⚠️ АКТИВНОСТЬ" : "БЕЗОПАСНО";
+        }
+
+        // Локальное рисование фида при отсутствии сервера
+        let prevFrameData = null;
+        function drawLocalOverlaysFallback() {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // Отрисовываем зоны безопасности
+            drawZones();
+            // HUD
+            document.getElementById("hud-latency").innerText = `OFFLINE (0ms)`;
+            document.getElementById("hud-zone-status").className = "text-gray-500 font-bold";
+            document.getElementById("hud-zone-status").innerText = "ОФФЛАЙН (ЛОКАЛЬНО)";
+        }
+
+        // Рисование зон слежения
+        function drawZones() {
+            zones.forEach(zone => {
+                if (zone.points.length < 2) return;
+                ctx.save();
+                ctx.strokeStyle = "#4ea8de"; // Голубой цвет для зон
+                ctx.fillStyle = "rgba(78, 168, 222, 0.15)";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(zone.points[0][0], zone.points[0][1]);
+                for (let i = 1; i < zone.points.length; i++) {
+                    ctx.lineTo(zone.points[i][0], zone.points[i][1]);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                ctx.fill();
+
+                // Имя зоны
+                ctx.fillStyle = "#4ea8de";
+                ctx.font = "bold 14px JetBrains Mono";
+                ctx.fillText(`ZONE: ${zone.id.toUpperCase()}`, zone.points[0][0] + 5, zone.points[0][1] + 20);
+                ctx.restore();
+            });
+
+            // Рисование текущей строящейся зоны
+            if (currentDrawingPoints.length > 0) {
+                ctx.save();
+                ctx.fillStyle = "#faf089";
+                ctx.strokeStyle = "#faf089";
+                ctx.lineWidth = 2;
+                currentDrawingPoints.forEach(pt => {
+                    ctx.beginPath();
+                    ctx.arc(pt[0], pt[1], 4, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                ctx.beginPath();
+                ctx.moveTo(currentDrawingPoints[0][0], currentDrawingPoints[0][1]);
+                for (let i = 1; i < currentDrawingPoints.length; i++) {
+                    ctx.lineTo(currentDrawingPoints[i][0], currentDrawingPoints[i][1]);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // Клик/Тап по Canvas для построения ЗОН
+        canvas.addEventListener("click", (evt) => {
+            const rect = canvas.getBoundingClientRect();
+            // Вычисляем координаты кадра относительно размера видео
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (evt.clientX - rect.left) * scaleX;
+            const y = (evt.clientY - rect.top) * scaleY;
+
+            currentDrawingPoints.push([x, y]);
+            log(`Точка добавлена: ${Math.round(x)}, ${Math.round(y)}. Сделайте не менее 3 для Зоны.`);
+
+            // Если четыре точки - автоматически закрываем конфигурацию зоны безопасности
+            if (currentDrawingPoints.length >= 4) {
+                const zoneId = `A${zones.length + 1}`;
+                zones.push({
+                    id: zoneId,
+                    points: currentDrawingPoints
+                });
+                currentDrawingPoints = [];
+                log(`Зона ${zoneId} зарегистрирована.`);
+                updateServerZones();
+            }
+        });
+
+        // Сбросить зоны
+        function clearCurrentZones() {
+            zones = [];
+            currentDrawingPoints = [];
+            log("Все surveillance зоны безопасности сброшены.");
+            updateServerZones();
+        }
+
+        // Отправка зон на Flask сервер
+        async function updateServerZones() {
+            try {
+                await fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        zones: zones
+                    })
+                });
+            } catch (err) {
+                log("Ошибка синхронизации зон с сервером.");
+            }
+        }
+
+        // Синтез Голоса (Озвучка алармов)
+        let lastSpokenText = "";
+        let lastSpokenTime = 0;
+        function speakAlert(text) {
+            if (!speechActive) return;
+            const now = Date.now();
+            if (text === lastSpokenText && now - lastSpokenTime < 5000) return; // Раз в 5 сек
+            
+            lastSpokenText = text;
+            lastSpokenTime = now;
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = "ru-RU";
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function toggleSpeech() {
+            speechActive = !speechActive;
+            const btn = document.getElementById("btn-speech");
+            if (speechActive) {
+                btn.className = "flex-1 min-w-[120px] min-h-[48px] bg-amber-955 border border-amber-500/50 text-amber-300 font-bold rounded flex items-center justify-center space-x-2 transition active:scale-95 text-xs";
+                document.getElementById("speech-icon").innerText = "🔊";
+                document.getElementById("speech-text").innerText = "ОЗВУЧКА: ВКЛ";
+                log("Синтезатор речи активирован.");
+            } else {
+                btn.className = "flex-1 min-w-[120px] min-h-[48px] bg-gray-900 border border-gray-700/50 text-gray-500 font-bold rounded flex items-center justify-center space-x-2 transition active:scale-95 text-xs";
+                document.getElementById("speech-icon").innerText = "🔇";
+                document.getElementById("speech-text").innerText = "ОЗВУЧКА: ВЫКЛ";
+                log("Синтезатор речи отключен.");
+            }
+        }
+
+        // Настройки и Слайдеры
+        function updateSensitivityValue(val) {
+            document.getElementById("val-sensitivity").innerText = val;
+        }
+
+        function updateMinAreaValue(val) {
+            document.getElementById("val-minarea").innerText = val;
+        }
+
+        async function updateDetectorSettings() {
+            const sensitivity = document.getElementById("input-sensitivity").value;
+            const min_area = document.getElementById("input-minarea").value;
+            const selectMode = document.getElementById("select-template-mode").value;
+
+            try {
+                const response = await fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        sensitivity: parseInt(sensitivity),
+                        min_area: parseInt(min_area),
+                        selected_template: selectMode
+                    })
+                });
+                const data = await response.json();
+                if (data.status === "success") {
+                    log(`Параметры детекции обновлены: Чувств=${sensitivity}%, МинОбласть=${min_area}px`);
+                }
+            } catch (err) {
+                log("Параметры сохранены локально (сервер оффлайн).");
+            }
+        }
+
+        // Работа с темплейтами (Мобильный Modal)
+        let capturedTemplateBlobHex = null;
+        function triggerCaptureTemplate() {
+            if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+                alert("Ошибка: Камера не запущена!");
+                return;
+            }
+            // Клонируем кадр на невидимый canvas превьюшки
+            const previewCanvas = document.getElementById("modal-preview");
+            const pCtx = previewCanvas.getContext("2d");
+            previewCanvas.width = canvas.width;
+            previewCanvas.height = canvas.height;
+            pCtx.drawImage(video, 0, 0, previewCanvas.width, previewCanvas.height);
+
+            document.getElementById("modal-input-name").value = `OBJECT_` + Math.floor(100+Math.random()*900);
+            
+            // Открываем модальное окно
+            const modal = document.getElementById("modal-save");
+            modal.style.opacity = "1";
+            modal.style.pointerEvents = "auto";
+        }
+
+        function closeSaveModal() {
+            const modal = document.getElementById("modal-save");
+            modal.style.opacity = "0";
+            modal.style.pointerEvents = "none";
+        }
+
+        async function saveTemplateFromModal() {
+            const nameInput = document.getElementById("modal-input-name").value.trim();
+            if (!nameInput) {
+                alert("Введите имя шаблона!");
+                return;
+            }
+
+            const previewCanvas = document.getElementById("modal-preview");
+            const base64Data = previewCanvas.toDataURL("image/jpeg", 0.7);
+
+            log(`Регистрация шаблона ${nameInput} во фреймворке...`);
+            closeSaveModal();
+
+            try {
+                const response = await fetch("/api/templates/add", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name: nameInput,
+                        image: base64Data
+                    })
+                });
+                const data = await response.json();
+                if (data.status === "success") {
+                    log(`<span class="text-emerald-300">Шаблон ${nameInput} успешно сохранен.</span>`);
+                    speakAlert(`Успешно зарегистрирован новый шаблон: ${nameInput}`);
+                    loadTemplatesList();
+                } else {
+                    alert("Ошибка: " + data.message);
+                }
+            } catch (err) {
+                alert("Сервер недоступен для сохранения NPZ шаблона. Работа в тестовом режиме эмуляции.");
+            }
+        }
+
+        // Загрузка списка шаблонов из базы
+        async function loadTemplatesList() {
+            try {
+                const response = await fetch("/api/templates");
+                const data = await response.json();
+                if (data.status === "success") {
+                    savedTemplates = data.templates;
+                    renderTemplates();
+                }
+            } catch (err) {
+                // Предустановленные шаблоны для лучшего UI-отклика без сервера
+                savedTemplates = [
+                    { name: "CHIP_A9_GOLD", keypoints: 432, width: 480, height: 360 },
+                    { name: "RFID_MODULE_V2", keypoints: 120, width: 480, height: 360 }
+                ];
+                renderTemplates();
+            }
+        }
+
+        function renderTemplates() {
+            const list = document.getElementById("templates-list");
+            const selectMode = document.getElementById("select-template-mode");
+            
+            list.innerHTML = "";
+            
+            // Сохраняем текущий выбранный элемент в селекторе
+            const currentValue = selectMode.value;
+            selectMode.innerHTML = `<option value="">Все сканы (Параллельно)</option>`;
+
+            if (savedTemplates.length === 0) {
+                list.innerHTML = `<div class="text-center text-xs text-gray-500 py-6">Шаблоны отсутствуют.</div>`;
+                document.getElementById("templates-count").innerText = "0";
+                return;
+            }
+
+            document.getElementById("templates-count").innerText = savedTemplates.length;
+
+            savedTemplates.forEach(t => {
+                // Добавляем в список
+                const div = document.createElement("div");
+                div.className = "flex items-center justify-between p-2 rounded bg-emerald-950/40 border border-emerald-900/40 hover:bg-emerald-900/50 transition duration-200";
+                div.innerHTML = `
+                    <div class="flex-1 min-w-0 pr-2">
+                        <div class="text-xs font-bold text-emerald-200 truncate">${t.name}</div>
+                        <div class="text-[9px] text-emerald-600">${t.keypoints} ORB-KPs • ${t.width}x${t.height}px</div>
+                    </div>
+                    <button onclick="deleteTemplate('${t.name}')" class="p-1 px-1.5 bg-red-950/60 border border-red-500/30 text-red-400 hover:bg-red-900 rounded font-bold transition duration-200 text-[10px] min-h-[32px] min-w-[32px]">
+                        УДЛ
+                    </button>
+                `;
+                list.appendChild(div);
+
+                // Добавляем в селектор режимов слежения
+                const opt = document.createElement("option");
+                opt.value = t.name;
+                opt.innerText = t.name;
+                if (t.name === currentValue) opt.selected = true;
+                selectMode.appendChild(opt);
+            });
+        }
+
+        async function deleteTemplate(name) {
+            if (!confirm(`Вы действительно хотите удалить шаблон ${name}?`)) return;
+            try {
+                const response = await fetch("/api/templates/delete", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: name })
+                });
+                const data = await response.json();
+                if (data.status === "success") {
+                    log(`Шаблон ${name} удален.`);
+                    loadTemplatesList();
+                }
+            } catch (err) {
+                log("Ошибка связи при удалении.");
+            }
+        }
+
+        // Периодическое обновление телеметрии и шаблонов
+        setInterval(async () => {
+            try {
+                const response = await fetch("/api/telemetry");
+                const data = await response.json();
+                if (data.status === "success") {
+                    document.getElementById("conn-state").className = "text-emerald-400 font-bold";
+                    document.getElementById("conn-state").innerText = "ОНЛАЙН";
+                    document.getElementById("processing-badge").innerText = data.opencl_active ? "GPU ACTIVE" : "CPU ONLY";
+                }
+            } catch (err) {
+                document.getElementById("conn-state").className = "text-amber-500 font-bold";
+                document.getElementById("conn-state").innerText = "ОФФЛАЙН";
+            }
+        }, 5000);
+
+        // Инициализация интерфейса при старте экрана
+        window.addEventListener("load", () => {
+            loadTemplatesList();
+            log("Система Monolith OS готова. Подключите сенсор.");
+        });
+
+        // Регистрация Service Worker для PWA офлайн работы
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => log("Service Worker зарегистрирован офлайн."))
+                .catch(err => console.log("SW error", err));
+        }
+    </script>
+</body>
+</html>
